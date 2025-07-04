@@ -98,7 +98,7 @@ class AIAssistant:
         
         config['Ollama'] = {
             'base_url': 'http://localhost:11434',
-            'model': 'llama2',
+            'model': 'tinyllama:1.1b',
             'timeout': '30'
         }
         
