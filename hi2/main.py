@@ -360,7 +360,6 @@ class AIAssistant:
                 'switch off': 'turn_off',
                 'set to high': 'set_speed',
                 'set to low': 'set_speed',
-                'setಸ
                 'set to medium': 'set_speed'
             }
             
