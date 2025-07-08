@@ -5,7 +5,7 @@ A comprehensive multi-modal AI assistant for Raspberry Pi 5 with CLI input
 
 This script integrates:
 - Conversational LLM via Ollama
-- Object detection using YOLOv8
+- Object detection using YOLOv8 with Raspberry Pi Camera Module 2
 - Home automation via Home Assistant API
 - Text input via CLI
 - Text output to console
@@ -27,6 +27,7 @@ from enum import Enum
 # Computer Vision Libraries
 import cv2
 from ultralytics import YOLO
+from picamera2 import Picamera2
 
 # Network and API Libraries
 import requests
@@ -109,7 +110,6 @@ class AIAssistant:
         }
         
         config['Camera'] = {
-            'device_id': '0',
             'resolution_width': '640',
             'resolution_height': '480'
         }
@@ -128,15 +128,23 @@ class AIAssistant:
         logger.warning("Please update the configuration file with your actual settings")
     
     def _init_vision_components(self):
-        """Initialize computer vision components"""
+        """Initialize computer vision components using Raspberry Pi Camera Module 2"""
         try:
-            # Initialize camera
-            self.camera = cv2.VideoCapture(int(self.config.get('Camera', 'device_id', fallback='0')))
-            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, int(self.config.get('Camera', 'resolution_width', fallback='640')))
-            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, int(self.config.get('Camera', 'resolution_height', fallback='480')))
+            # Initialize PiCamera2
+            self.camera = Picamera2()
             
-            if not self.camera.isOpened():
-                raise Exception("Could not open camera")
+            # Configure camera with desired resolution
+            resolution_width = int(self.config.get('Camera', 'resolution_width', fallback='640'))
+            resolution_height = int(self.config.get('Camera', 'resolution_height', fallback='480'))
+            
+            # Create a configuration for the camera
+            camera_config = self.camera.create_still_configuration(
+                main={"size": (resolution_width, resolution_height)}
+            )
+            self.camera.configure(camera_config)
+            
+            # Start the camera
+            self.camera.start()
             
             # Initialize YOLO model
             self.yolo_model = YOLO('yolov8n.pt')
@@ -265,8 +273,7 @@ class AIAssistant:
     
     def run_object_detection(self) -> str:
         """
- suicid
-        Capture image and run object detection
+        Capture image from Raspberry Pi Camera Module 2 and run object detection
         
         Returns:
             Descriptive text of detected objects
@@ -274,10 +281,11 @@ class AIAssistant:
         try:
             logger.info("Capturing image for object detection...")
             
-            # Capture frame from camera
-            ret, frame = self.camera.read()
-            if not ret:
-                raise Exception("Failed to capture image from camera")
+            # Capture frame from PiCamera2
+            frame = self.camera.capture_array()
+            
+            # Convert frame to BGR format for OpenCV/YOLO compatibility
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             
             # Run YOLO detection
             results = self.yolo_model(frame)
@@ -352,6 +360,7 @@ class AIAssistant:
                 'switch off': 'turn_off',
                 'set to high': 'set_speed',
                 'set to low': 'set_speed',
+                'setಸ
                 'set to medium': 'set_speed'
             }
             
@@ -487,7 +496,8 @@ class AIAssistant:
     def stop_listening(self):
         """Stop the assistant and cleanup"""
         if hasattr(self, 'camera'):
-            self.camera.release()
+            self.camera.stop()
+            self.camera.close()
         cv2.destroyAllWindows()
         print("Goodbye!")
         logger.info("AI Assistant stopped")
