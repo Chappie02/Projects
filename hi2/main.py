@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 RPi5_MultiModal_AI_Assistant
-A comprehensive multi-modal AI assistant for Raspberry Pi 5 with CLI input
+A comprehensive multi-modal AI assistant for Raspberry Pi 5
 
 This script integrates:
 - Conversational LLM via Ollama
-- Object detection using YOLOv8 with Raspberry Pi Camera
+- Object detection using YOLOv8
 - Home automation via Home Assistant API
-- Text input via CLI
-- Text output to console
+- Wake word detection and speech recognition
+- Text-to-speech output
 
 Author: AI Assistant
 Date: 2024
@@ -24,11 +24,15 @@ import logging
 from typing import Optional, Dict, List, Tuple
 from enum import Enum
 
+# Audio and Speech Libraries
+import speech_recognition as sr
+import pyttsx3
+import sounddevice as sd
+import numpy as np
+
 # Computer Vision Libraries
 import cv2
 from ultralytics import YOLO
-import picamera
-import numpy as np
 
 # Network and API Libraries
 import requests
@@ -57,7 +61,7 @@ class AssistantMode(Enum):
 
 class AIAssistant:
     """
-    Main AI Assistant class that handles multi-modal interactions with CLI input
+    Main AI Assistant class that handles multi-modal interactions
     """
     
     def __init__(self, config_file: str = "config.ini"):
@@ -70,8 +74,11 @@ class AIAssistant:
         self.config = self._load_config(config_file)
         self.current_mode = AssistantMode.MAIN_LLM
         self.wake_word = self.config.get('Assistant', 'wake_word', fallback='jarvis')
+        self.is_listening = False
+        self.audio_queue = queue.Queue()
         
         # Initialize components
+        self._init_speech_components()
         self._init_vision_components()
         self._init_llm_components()
         self._init_home_assistant()
@@ -100,7 +107,7 @@ class AIAssistant:
         
         config['Ollama'] = {
             'base_url': 'http://localhost:11434',
-            'model': 'tinyllama:1.1b',
+            'model': 'llama2',
             'timeout': '30'
         }
         
@@ -111,6 +118,7 @@ class AIAssistant:
         }
         
         config['Camera'] = {
+            'device_id': '0',
             'resolution_width': '640',
             'resolution_height': '480'
         }
@@ -128,18 +136,64 @@ class AIAssistant:
         logger.info(f"Default configuration created at {config_file}")
         logger.warning("Please update the configuration file with your actual settings")
     
-    def _init_vision_components(self):
-        """Initialize computer vision components using Raspberry Pi Camera"""
+    def _init_speech_components(self):
+        """Initialize speech recognition and text-to-speech components"""
         try:
-            # Initialize PiCamera
-            self.camera = picamera.PiCamera()
+            # Initialize speech recognition
+            self.recognizer = sr.Recognizer()
+            self.recognizer.energy_threshold = 4000
+            self.recognizer.dynamic_energy_threshold = True
+            self.recognizer.pause_threshold = 0.8
             
-            # Configure camera with desired resolution
-            resolution_width = int(self.config.get('Camera', 'resolution_width', fallback='640'))
-            resolution_height = int(self.config.get('Camera', 'resolution_height', fallback='480'))
+            # Get microphone device index from config
+            mic_index_str = self.config.get('Audio', 'mic_device_index', fallback=None)
+            self.mic_device_index = int(mic_index_str) if mic_index_str is not None else None
             
-            # Set camera resolution
-            self.camera.resolution = (resolution_width, resolution_height)
+            # Uncomment to print available microphones for setup
+            # self.print_available_microphones()
+            
+            # Initialize text-to-speech
+            self.tts_engine = pyttsx3.init()
+            self.tts_engine.setProperty('rate', int(self.config.get('Assistant', 'voice_rate', fallback='150')))
+            self.tts_engine.setProperty('volume', float(self.config.get('Assistant', 'voice_volume', fallback='0.9')))
+            
+            # Get available voices and set to a good one
+            voices = self.tts_engine.getProperty('voices')
+            if voices:
+                # Prefer a male voice if available
+                for voice in voices:
+                    if 'male' in voice.name.lower() or 'david' in voice.name.lower():
+                        self.tts_engine.setProperty('voice', voice.id)
+                        break
+                else:
+                    self.tts_engine.setProperty('voice', voices[0].id)
+            
+            logger.info("Speech components initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize speech components: {e}")
+            raise
+    
+    def print_available_microphones(self):
+        """Print all available microphone devices (for setup/debug)"""
+        try:
+            mic_names = sr.Microphone.list_microphone_names()
+            print("Available microphones:")
+            for i, name in enumerate(mic_names):
+                print(f"  [{i}] {name}")
+        except Exception as e:
+            print(f"Error listing microphones: {e}")
+    
+    def _init_vision_components(self):
+        """Initialize computer vision components"""
+        try:
+            # Initialize camera
+            self.camera = cv2.VideoCapture(int(self.config.get('Camera', 'device_id', fallback='0')))
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, int(self.config.get('Camera', 'resolution_width', fallback='640')))
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, int(self.config.get('Camera', 'resolution_height', fallback='480')))
+            
+            if not self.camera.isOpened():
+                raise Exception("Could not open camera")
             
             # Initialize YOLO model
             self.yolo_model = YOLO('yolov8n.pt')
@@ -185,6 +239,85 @@ class AIAssistant:
                 logger.warning(f"Could not test Home Assistant connection: {e}")
         else:
             logger.warning("Home Assistant token not configured")
+    
+    def speak(self, text: str):
+        """
+        Convert text to speech and play it
+        
+        Args:
+            text: Text to speak
+        """
+        try:
+            logger.info(f"Speaking: {text}")
+            self.tts_engine.say(text)
+            self.tts_engine.runAndWait()
+        except Exception as e:
+            logger.error(f"Error in text-to-speech: {e}")
+    
+    def listen_for_wake_word(self) -> bool:
+        """
+        Listen for the wake word in a continuous loop
+        
+        Returns:
+            True if wake word detected, False otherwise
+        """
+        try:
+            with sr.Microphone(device_index=self.mic_device_index) as source:
+                logger.info("Listening for wake word...")
+                self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                
+                while self.is_listening:
+                    try:
+                        audio = self.recognizer.listen(source, timeout=1, phrase_time_limit=3)
+                        text = self.recognizer.recognize_google(audio).lower()
+                        
+                        if self.wake_word.lower() in text:
+                            logger.info(f"Wake word '{self.wake_word}' detected!")
+                            return True
+                            
+                    except sr.WaitTimeoutError:
+                        continue
+                    except sr.UnknownValueError:
+                        continue
+                    except sr.RequestError as e:
+                        logger.error(f"Speech recognition error: {e}")
+                        continue
+                        
+        except Exception as e:
+            logger.error(f"Error in wake word detection: {e}")
+        
+        return False
+    
+    def listen_for_command(self) -> Optional[str]:
+        """
+        Listen for a user command after wake word detection
+        
+        Returns:
+            Recognized command text or None if failed
+        """
+        try:
+            with sr.Microphone(device_index=self.mic_device_index) as source:
+                logger.info("Listening for command...")
+                self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                
+                audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=10)
+                text = self.recognizer.recognize_google(audio)
+                
+                logger.info(f"Command recognized: {text}")
+                return text
+                
+        except sr.WaitTimeoutError:
+            logger.info("No command detected within timeout")
+            return None
+        except sr.UnknownValueError:
+            logger.info("Could not understand the command")
+            return None
+        except sr.RequestError as e:
+            logger.error(f"Speech recognition error: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error in command recognition: {e}")
+            return None
     
     def query_ollama(self, prompt: str) -> Optional[str]:
         """
@@ -268,7 +401,7 @@ class AIAssistant:
     
     def run_object_detection(self) -> str:
         """
-        Capture image from Raspberry Pi Camera and run object detection
+        Capture image and run object detection
         
         Returns:
             Descriptive text of detected objects
@@ -276,12 +409,10 @@ class AIAssistant:
         try:
             logger.info("Capturing image for object detection...")
             
-            # Capture frame from PiCamera
-            output = np.empty((self.camera.resolution[1], self.camera.resolution[0], 3), dtype=np.uint8)
-            self.camera.capture(output, 'rgb')
-            
-            # Convert frame to BGR format for OpenCV/YOLO compatibility
-            frame = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
+            # Capture frame from camera
+            ret, frame = self.camera.read()
+            if not ret:
+                raise Exception("Failed to capture image from camera")
             
             # Run YOLO detection
             results = self.yolo_model(frame)
@@ -328,7 +459,7 @@ class AIAssistant:
         Parse command and control Home Assistant devices
         
         Args:
-            command: Text command for home automation
+            command: Voice command for home automation
             
         Returns:
             Confirmation message
@@ -444,42 +575,62 @@ class AIAssistant:
             return "Sorry, I encountered an error while trying to control the device."
     
     def start_listening(self):
-        """Start the main loop to accept CLI input"""
-        print("Hello! I'm your AI assistant. I'm ready to help you.")
+        """Start the main listening loop"""
+        self.is_listening = True
         logger.info("Starting AI Assistant...")
+        self.speak("Hello! I'm your AI assistant. I'm ready to help you.")
         
         try:
-            while True:
-                command = input("Enter your command (or 'exit' to quit): ")
-                
-                if command.lower() == 'exit':
-                    print("Goodbye!")
-                    break
-                
-                if self.current_mode == AssistantMode.MAIN_LLM:
-                    response = self.query_ollama(command)
-                    if response:
-                        new_mode = self.process_llm_response(response)
-                        
-                        if new_mode != AssistantMode.MAIN_LLM:
-                            self.current_mode = new_mode
-                            if new_mode == AssistantMode.OBJECT_DETECTION:
-                                print("Switching to object detection mode.")
-                                detection_result = self.run_object_detection()
-                                print(detection_result)
-                                self.current_mode = AssistantMode.MAIN_LLM
-                                print("Back to main mode.")
-                            elif new_mode == AssistantMode.HOME_AUTOMATION:
-                                print("Switching to home automation mode. Enter your home automation command:")
-                                ha_command = input("> ")
-                                confirmation = self.control_home_device(ha_command)
-                                print(confirmation)
-                                self.current_mode = AssistantMode.MAIN_LLM
-                                print("Back to main mode.")
+            while self.is_listening:
+                # Listen for wake word
+                if self.listen_for_wake_word():
+                    self.speak("Yes, I'm listening.")
+                    
+                    # Listen for command
+                    command = self.listen_for_command()
+                    if not command:
+                        self.speak("I didn't catch that. Could you please repeat?")
+                        continue
+                    
+                    # Process command based on current mode
+                    if self.current_mode == AssistantMode.MAIN_LLM:
+                        # Send to LLM
+                        response = self.query_ollama(command)
+                        if response:
+                            # Check for mode switching
+                            new_mode = self.process_llm_response(response)
+                            
+                            if new_mode != AssistantMode.MAIN_LLM:
+                                self.current_mode = new_mode
+                                if new_mode == AssistantMode.OBJECT_DETECTION:
+                                    self.speak("Switching to object detection mode.")
+                                    detection_result = self.run_object_detection()
+                                    self.speak(detection_result)
+                                    self.current_mode = AssistantMode.MAIN_LLM
+                                    self.speak("Back to main mode.")
+                                elif new_mode == AssistantMode.HOME_AUTOMATION:
+                                    self.speak("Switching to home automation mode. What would you like me to control?")
+                                    ha_command = self.listen_for_command()
+                                    if ha_command:
+                                        confirmation = self.control_home_device(ha_command)
+                                        self.speak(confirmation)
+                                    self.current_mode = AssistantMode.MAIN_LLM
+                                    self.speak("Back to main mode.")
+                            else:
+                                # Normal LLM response
+                                self.speak(response)
                         else:
-                            print(response)
-                    else:
-                        print("Sorry, I couldn't process your request. Please try again.")
+                            self.speak("Sorry, I couldn't process your request. Please try again.")
+                    
+                    elif self.current_mode == AssistantMode.OBJECT_DETECTION:
+                        detection_result = self.run_object_detection()
+                        self.speak(detection_result)
+                        self.current_mode = AssistantMode.MAIN_LLM
+                    
+                    elif self.current_mode == AssistantMode.HOME_AUTOMATION:
+                        confirmation = self.control_home_device(command)
+                        self.speak(confirmation)
+                        self.current_mode = AssistantMode.MAIN_LLM
                 
         except KeyboardInterrupt:
             logger.info("Shutting down AI Assistant...")
@@ -489,17 +640,18 @@ class AIAssistant:
             self.stop_listening()
     
     def stop_listening(self):
-        """Stop the assistant and cleanup"""
+        """Stop the listening loop and cleanup"""
+        self.is_listening = False
         if hasattr(self, 'camera'):
-            self.camera.close()
+            self.camera.release()
         cv2.destroyAllWindows()
-        print("Goodbye!")
+        self.speak("Goodbye!")
         logger.info("AI Assistant stopped")
 
 def main():
     """Main function to run the AI Assistant"""
     print("=" * 60)
-    print("RPi5 Multi-Modal AI Assistant (CLI Version)")
+    print("RPi5 Multi-Modal AI Assistant")
     print("=" * 60)
     print("Initializing...")
     
@@ -518,4 +670,4 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    main() 
