@@ -1,7 +1,6 @@
 from chat_mode import ChatMode
 from object_detection_mode import ObjectDetectionMode
 
-
 def main():
     chat_mode = ChatMode()
     object_detection_mode = ObjectDetectionMode()
@@ -37,4 +36,4 @@ def main():
             print("[ObjectDetectionMode] Unrecognized command. Returning to object detection.")
 
 if __name__ == "__main__":
-    main() 
+    main()
