@@ -1,11 +1,10 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import requests
 from sentence_transformers import SentenceTransformer, util
 
 class ChatMode:
-    def __init__(self, model_name='distilgpt2'):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name)
-        self.generator = pipeline('text-generation', model=self.model, tokenizer=self.tokenizer, max_length=100)
+    def __init__(self, model_name='llama3', api_url='http://localhost:11434'):
+        self.model_name = model_name
+        self.api_url = api_url
         # For intent recognition
         self.intent_model = SentenceTransformer('all-MiniLM-L6-v2')
         self.switch_phrases = [
@@ -25,8 +24,22 @@ class ChatMode:
         ]
 
     def generate_response(self, user_input):
-        response = self.generator(user_input, max_length=100, num_return_sequences=1)[0]['generated_text']
-        return response[len(user_input):].strip()
+        try:
+            response = requests.post(
+                f"{self.api_url}/api/generate",
+                json={
+                    "model": self.model_name,
+                    "prompt": user_input,
+                    "max_tokens": 100,  # Adjust as needed
+                    "stream": False
+                }
+            )
+            response.raise_for_status()
+            generated_text = response.json().get('response', '')
+            # Remove the input prompt from the response, if present
+            return generated_text[len(user_input):].strip() if generated_text.startswith(user_input) else generated_text.strip()
+        except requests.RequestException as e:
+            return f"Error communicating with Ollama API: {e}"
 
     def detect_intent(self, user_input):
         # Returns 'object_detection', 'chat', or None
@@ -39,4 +52,4 @@ class ChatMode:
                 return 'object_detection'
             else:
                 return 'chat'
-        return None 
+        return None
