@@ -1,14 +1,13 @@
 import cv2
-import torch
-import torchvision
+from picamera2 import Picamera2
+from ultralytics import YOLO
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
 
 class ObjectDetectionMode:
     def __init__(self):
-        # Load a pre-trained MobileNet SSD model from torchvision
-        self.model = torchvision.models.detection.ssdlite320_mobilenet_v3_large(pretrained=True)
-        self.model.eval()
+        # Load pre-trained YOLOv8 Nano model
+        self.model = YOLO('yolov8n.pt')
         self.COCO_INSTANCE_CATEGORY_NAMES = [
             '__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
             'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 'stop sign',
@@ -33,32 +32,47 @@ class ObjectDetectionMode:
         ]
 
     def detect_objects(self, camera_index=0):
-        cap = cv2.VideoCapture(camera_index)
+        # Initialize Raspberry Pi camera
+        picam2 = Picamera2()
+        picam2.configure(picam2.create_preview_configuration(main={"size": (640, 480)}))
+        picam2.start()
         print("[ObjectDetectionMode] Press 'q' to stop object detection.")
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("[ObjectDetectionMode] Failed to grab frame.")
-                break
-            # Convert frame to tensor
-            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img = torch.from_numpy(img / 255.).permute(2, 0, 1).float().unsqueeze(0)
-            with torch.no_grad():
-                preds = self.model(img)[0]
-            labels = preds['labels'].numpy()
-            scores = preds['scores'].numpy()
-            detected = set()
-            for label, score in zip(labels, scores):
-                if score > 0.5:
-                    detected.add(self.COCO_INSTANCE_CATEGORY_NAMES[label])
-            if detected:
-                print(f"Detected objects: {', '.join(detected)}")
-            # Show the frame
-            cv2.imshow('Object Detection', frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        cap.release()
-        cv2.destroyAllWindows()
+        
+        try:
+            while True:
+                # Capture frame from Pi camera
+                frame = picam2.capture_array()
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert to BGR for OpenCV
+                
+                # Run YOLOv8 inference
+                results = self.model(frame, verbose=False)
+                detected = set()
+                
+                # Process detection results
+                for result in results:
+                    for box in result.boxes:
+                        confidence = box.conf.item()
+                        if confidence > 0.5:
+                            label = self.COCO_INSTANCE_CATEGORY_NAMES[int(box.cls)]
+                            if label != '__background__' and label != 'N/A':
+                                detected.add(f"{label} ({confidence:.2f})")
+                
+                # Print detected objects
+                if detected:
+                    print(f"Detected objects: {', '.join(detected)}")
+                
+                # Show the frame with bounding boxes
+                annotated_frame = results[0].plot()  # YOLOv8 provides a method to draw boxes
+                cv2.imshow('Object Detection', annotated_frame)
+                
+                # Check for 'q' key to exit
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+        
+        finally:
+            # Clean up
+            picam2.stop()
+            cv2.destroyAllWindows()
 
     def detect_intent(self, user_input):
         # Returns 'chat' or None
@@ -67,4 +81,4 @@ class ObjectDetectionMode:
         max_idx = similarities.argmax().item()
         if similarities[max_idx] > 0.7:
             return 'chat'
-        return None 
+        return None
