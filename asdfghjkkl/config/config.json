@@ -1,0 +1,19 @@
+{
+  "llm": {
+    "backend": "ollama",
+    "model": "phi-2",
+    "model_path": "/path/to/phi-2-q4.bin",
+    "ollama_url": "http://localhost:11434"
+  },
+  "object_detection": {
+    "model_path": "/path/to/yolov8n.pt",
+    "camera_index": 0
+  },
+  "home_automation": {
+    "backend": "home_assistant",
+    "ha_url": "http://homeassistant.local:8123",
+    "ha_token": "YOUR_LONG_LIVED_ACCESS_TOKEN",
+    "mqtt_broker": "localhost",
+    "mqtt_topic_prefix": "home/"
+  }
+} 
