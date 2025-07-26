@@ -1,6 +1,0 @@
-llama-cpp-python
-ultralytics
-opencv-python
-requests
-paho-mqtt
-prompt-toolkit 
