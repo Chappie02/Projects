@@ -1,0 +1,9 @@
+ultralytics==8.0.196
+opencv-python==4.8.1.78
+requests==2.31.0
+asyncio-mqtt==0.16.1
+aiohttp==3.9.1
+numpy==1.24.3
+Pillow==10.0.1
+python-dotenv==1.0.0
+picamera2; platform_system == "Linux"
