@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Speaker Isolation & Identification</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .status-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #28a745;
+        }
+        
+        .status-card.disconnected {
+            border-left-color: #dc3545;
+        }
+        
+        .speaker-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        
+        .speaker-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .speaker-card.unknown {
+            border-left: 4px solid #ffc107;
+        }
+        
+        .speaker-card.known {
+            border-left: 4px solid #28a745;
+        }
+        
+        .transcript-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 100px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .confidence-bar {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
+            transition: width 0.3s ease;
+        }
+        
+        .waveform-container {
+            height: 60px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .waveform {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #007bff;
+            transform: translateY(-50%);
+            transition: all 0.1s ease;
+        }
+        
+        .control-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn-custom {
+            border-radius: 25px;
+            padding: 10px 30px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-start {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            border: none;
+            color: white;
+        }
+        
+        .btn-stop {
+            background: linear-gradient(135deg, #dc3545, #fd7e14);
+            border: none;
+            color: white;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .speaker-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            margin-right: 15px;
+        }
+        
+        .speaker-avatar.known {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+        
+        .speaker-avatar.unknown {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Header -->
+        <div class="header text-center">
+            <h1><i class="fas fa-microphone-alt"></i> Real-Time Speaker Isolation & Identification</h1>
+            <p class="mb-0">Advanced AI-powered speaker separation, identification, and transcription</p>
+        </div>
+        
+        <!-- Connection Status -->
+        <div class="status-card" id="connectionStatus">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h5 class="mb-1">
+                        <i class="fas fa-circle text-success" id="connectionIcon"></i>
+                        <span id="connectionText">Connecting...</span>
+                    </h5>
+                    <small class="text-muted" id="connectionDetails">Establishing WebSocket connection...</small>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button class="btn btn-outline-primary btn-sm" onclick="reconnect()">
+                        <i class="fas fa-sync-alt"></i> Reconnect
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5><i class="fas fa-cogs"></i> Session Control</h5>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-start btn-custom" id="startBtn" onclick="startSession()">
+                            <i class="fas fa-play"></i> Start Session
+                        </button>
+                        <button class="btn btn-stop btn-custom" id="stopBtn" onclick="stopSession()" disabled>
+                            <i class="fas fa-stop"></i> Stop Session
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="clearTranscripts()">
+                            <i class="fas fa-trash"></i> Clear Transcripts
+                        </button>
+                        <button class="btn btn-outline-info btn-sm" onclick="exportTranscripts()">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="activeSpeakers">0</div>
+                <div class="stat-label">Active Speakers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalTranscripts">0</div>
+                <div class="stat-label">Total Transcripts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="sessionDuration">00:00</div>
+                <div class="stat-label">Session Duration</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgConfidence">0%</div>
+                <div class="stat-label">Avg Confidence</div>
+            </div>
+        </div>
+        
+        <!-- Speakers Section -->
+        <div class="row">
+            <div class="col-12">
+                <h4><i class="fas fa-users"></i> Live Speakers</h4>
+                <div id="speakersContainer">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-microphone-slash fa-3x mb-3"></i>
+                        <p>No speakers detected yet. Start a session to begin.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Loading Spinner -->
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Processing audio...</p>
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Global variables
+        let ws = null;
+        let sessionStartTime = null;
+        let sessionInterval = null;
+        let speakers = new Map();
+        let transcripts = new Map();
+        
+        // WebSocket connection
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function(event) {
+                updateConnectionStatus(true, 'Connected', 'WebSocket connection established');
+                showToast('Connected to server', 'success');
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+            
+            ws.onclose = function(event) {
+                updateConnectionStatus(false, 'Disconnected', 'WebSocket connection lost');
+                showToast('Connection lost', 'warning');
+                
+                // Attempt to reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateConnectionStatus(false, 'Error', 'Connection error occurred');
+            };
+        }
+        
+        function updateConnectionStatus(connected, status, details) {
+            const statusCard = document.getElementById('connectionStatus');
+            const icon = document.getElementById('connectionIcon');
+            const text = document.getElementById('connectionText');
+            const detailsEl = document.getElementById('connectionDetails');
+            
+            if (connected) {
+                statusCard.classList.remove('disconnected');
+                icon.className = 'fas fa-circle text-success pulse';
+            } else {
+                statusCard.classList.add('disconnected');
+                icon.className = 'fas fa-circle text-danger';
+            }
+            
+            text.textContent = status;
+            detailsEl.textContent = details;
+        }
+        
+        function handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'separation':
+                    handleSeparationUpdate(data);
+                    break;
+                case 'speakers':
+                    handleSpeakerUpdate(data);
+                    break;
+                case 'transcription':
+                    handleTranscriptionUpdate(data);
+                    break;
+                case 'pong':
+                    // Keep-alive response
+                    break;
+                default:
+                    console.log('Unknown message type:', data.type);
+            }
+        }
+        
+        function handleSeparationUpdate(data) {
+            document.getElementById('activeSpeakers').textContent = data.num_speakers;
+            
+            // Show loading spinner briefly
+            const spinner = document.getElementById('loadingSpinner');
+            spinner.style.display = 'block';
+            setTimeout(() => {
+                spinner.style.display = 'none';
+            }, 500);
+        }
+        
+        function handleSpeakerUpdate(data) {
+            data.active_speakers.forEach(speaker => {
+                speakers.set(speaker.speaker_id, speaker);
+                updateSpeakerCard(speaker);
+            });
+            
+            updateStatistics();
+        }
+        
+        function handleTranscriptionUpdate(data) {
+            if (!transcripts.has(data.speaker_id)) {
+                transcripts.set(data.speaker_id, []);
+            }
+            
+            const speakerTranscripts = transcripts.get(data.speaker_id);
+            speakerTranscripts.push({
+                text: data.text,
+                confidence: data.confidence,
+                timestamp: data.timestamp,
+                is_final: data.is_final
+            });
+            
+            updateSpeakerTranscript(data.speaker_id, speakerTranscripts);
+            updateStatistics();
+        }
+        
+        function updateSpeakerCard(speaker) {
+            const container = document.getElementById('speakersContainer');
+            
+            // Clear empty state if present
+            const emptyState = container.querySelector('.text-center.text-muted');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            let card = document.getElementById(`speaker-${speaker.speaker_id}`);
+            
+            if (!card) {
+                card = createSpeakerCard(speaker);
+                container.appendChild(card);
+            }
+            
+            // Update card content
+            const nameEl = card.querySelector('.speaker-name');
+            const confidenceEl = card.querySelector('.confidence-fill');
+            const avatarEl = card.querySelector('.speaker-avatar');
+            
+            nameEl.textContent = speaker.name;
+            confidenceEl.style.width = `${(speaker.confidence * 100).toFixed(1)}%`;
+            
+            if (speaker.is_unknown) {
+                card.classList.add('unknown');
+                card.classList.remove('known');
+                avatarEl.classList.add('unknown');
+                avatarEl.classList.remove('known');
+                avatarEl.innerHTML = '<i class="fas fa-question"></i>';
+            } else {
+                card.classList.add('known');
+                card.classList.remove('unknown');
+                avatarEl.classList.add('known');
+                avatarEl.classList.remove('unknown');
+                avatarEl.innerHTML = '<i class="fas fa-user"></i>';
+            }
+        }
+        
+        function createSpeakerCard(speaker) {
+            const card = document.createElement('div');
+            card.className = 'speaker-card';
+            card.id = `speaker-${speaker.speaker_id}`;
+            
+            card.innerHTML = `
+                <div class="row align-items-center">
+                    <div class="col-md-1">
+                        <div class="speaker-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="speaker-name mb-1">${speaker.name}</h6>
+                        <small class="text-muted">ID: ${speaker.speaker_id}</small>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="transcript-box" id="transcript-${speaker.speaker_id}">
+                            <div class="text-muted">Waiting for speech...</div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="waveform-container">
+                            <div class="waveform"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        function updateSpeakerTranscript(speakerId, transcriptList) {
+            const transcriptEl = document.getElementById(`transcript-${speakerId}`);
+            
+            if (transcriptList.length === 0) {
+                transcriptEl.innerHTML = '<div class="text-muted">Waiting for speech...</div>';
+                return;
+            }
+            
+            // Show only recent transcripts (last 5)
+            const recentTranscripts = transcriptList.slice(-5);
+            
+            transcriptEl.innerHTML = recentTranscripts.map(t => `
+                <div class="mb-1">
+                    <span class="text-muted">[${new Date(t.timestamp * 1000).toLocaleTimeString()}]</span>
+                    <span class="ms-2">${t.text}</span>
+                    <small class="text-muted ms-2">(${(t.confidence * 100).toFixed(0)}%)</small>
+                </div>
+            `).join('');
+            
+            // Auto-scroll to bottom
+            transcriptEl.scrollTop = transcriptEl.scrollHeight;
+        }
+        
+        function updateStatistics() {
+            document.getElementById('activeSpeakers').textContent = speakers.size;
+            document.getElementById('totalTranscripts').textContent = 
+                Array.from(transcripts.values()).reduce((sum, t) => sum + t.length, 0);
+            
+            // Calculate average confidence
+            let totalConfidence = 0;
+            let confidenceCount = 0;
+            
+            Array.from(transcripts.values()).forEach(transcriptList => {
+                transcriptList.forEach(t => {
+                    totalConfidence += t.confidence;
+                    confidenceCount++;
+                });
+            });
+            
+            const avgConfidence = confidenceCount > 0 ? (totalConfidence / confidenceCount) * 100 : 0;
+            document.getElementById('avgConfidence').textContent = `${avgConfidence.toFixed(0)}%`;
+        }
+        
+        function updateSessionDuration() {
+            if (sessionStartTime) {
+                const elapsed = Date.now() - sessionStartTime;
+                const minutes = Math.floor(elapsed / 60000);
+                const seconds = Math.floor((elapsed % 60000) / 1000);
+                document.getElementById('sessionDuration').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+        
+        // API calls
+        async function startSession() {
+            try {
+                const response = await fetch('/api/sessions/start', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    sessionStartTime = Date.now();
+                    sessionInterval = setInterval(updateSessionDuration, 1000);
+                    
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    
+                    showToast('Session started successfully', 'success');
+                } else {
+                    throw new Error('Failed to start session');
+                }
+            } catch (error) {
+                console.error('Error starting session:', error);
+                showToast('Failed to start session', 'danger');
+            }
+        }
+        
+        async function stopSession() {
+            try {
+                const response = await fetch('/api/sessions/stop', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    sessionStartTime = null;
+                    if (sessionInterval) {
+                        clearInterval(sessionInterval);
+                        sessionInterval = null;
+                    }
+                    
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    
+                    showToast('Session stopped', 'info');
+                } else {
+                    throw new Error('Failed to stop session');
+                }
+            } catch (error) {
+                console.error('Error stopping session:', error);
+                showToast('Failed to stop session', 'danger');
+            }
+        }
+        
+        function clearTranscripts() {
+            speakers.clear();
+            transcripts.clear();
+            document.getElementById('speakersContainer').innerHTML = `
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-microphone-slash fa-3x mb-3"></i>
+                    <p>No speakers detected yet. Start a session to begin.</p>
+                </div>
+            `;
+            updateStatistics();
+            showToast('Transcripts cleared', 'info');
+        }
+        
+        function exportTranscripts() {
+            const exportData = {
+                speakers: Array.from(speakers.entries()),
+                transcripts: Array.from(transcripts.entries()),
+                exportTime: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+                type: 'application/json'
+            });
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transcripts_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast('Transcripts exported', 'success');
+        }
+        
+        function reconnect() {
+            if (ws) {
+                ws.close();
+            }
+            connectWebSocket();
+        }
+        
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toastId = 'toast-' + Date.now();
+            
+            const toastHtml = `
+                <div class="toast" id="${toastId}" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-header">
+                        <strong class="me-auto">Speaker System</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement);
+            toast.show();
+            
+            // Remove toast element after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            connectWebSocket();
+            
+            // Send ping every 30 seconds to keep connection alive
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 30000);
+        });
+    </script>
+</body>
+</html>
