@@ -1,0 +1,29 @@
+{
+  "speaker_1": {
+    "file": "/home/suhas/Desktop/lavanya2/output/speaker_1.wav",
+    "segments": [
+      {
+        "start": 0.0,
+        "end": 12.0,
+        "text": "¡Pero no puedo que me damos un tiempo para estar a mo... ¡Ay, a que parete mi!"
+      },
+      {
+        "start": 12.0,
+        "end": 13.0,
+        "text": "¡Yo llena!"
+      }
+    ],
+    "text": "¡Pero no puedo que me damos un tiempo para estar a mo... ¡Ay, a que parete mi! ¡Yo llena!"
+  },
+  "speaker_2": {
+    "file": "/home/suhas/Desktop/lavanya2/output/speaker_2.wav",
+    "segments": [
+      {
+        "start": 0.0,
+        "end": 12.85,
+        "text": "I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man"
+      }
+    ],
+    "text": "I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man, I'm not a bad man"
+  }
+}
