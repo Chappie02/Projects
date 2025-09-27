@@ -1,5 +1,0 @@
-llama-cpp-python==0.2.85
-ultralytics==8.2.67
-opencv-python==4.10.0.84
-picamera2==0.3.18
-numpy==1.26.4
