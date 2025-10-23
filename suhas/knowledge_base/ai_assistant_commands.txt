@@ -1,0 +1,35 @@
+AI Assistant Commands Reference
+
+CHAT MODE COMMANDS:
+/help - Show available commands
+/stats - Display system and knowledge base statistics  
+/clear - Clear conversation history
+/exit - Exit chat mode
+/quit - Exit chat mode
+
+OBJECT DETECTION COMMANDS:
+/help - Show available commands
+/stats - Display detection statistics
+/save - Save current frame with detections
+/clear - Clear detection history
+/exit - Exit object detection mode
+/quit - Exit object detection mode
+
+MAIN MENU OPTIONS:
+1 - Chat Mode (RAG + llama.cpp)
+2 - Object Detection Mode (YOLOv8)
+3 - System Status
+4 - Configuration
+5 - Exit
+
+SYSTEM MONITORING:
+- CPU usage monitoring
+- Memory usage tracking
+- Temperature monitoring
+- Disk space checking
+
+TROUBLESHOOTING COMMANDS:
+- Check system health with /stats
+- Monitor resource usage
+- View configuration settings
+- Check model file availability
