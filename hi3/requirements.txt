@@ -1,6 +1,0 @@
-transformers
-sentence-transformers
-torch
-opencv-python
-torchvision
-numpy 
