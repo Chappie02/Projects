@@ -14,7 +14,7 @@ from typing import Optional
 
 # Add project root to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
+sys.path.append("/usr/lib/python3/dist-packages")
 from modes.chat_mode import ChatMode
 from modes.object_mode import ObjectMode
 from utils.system_utils import print_banner, check_system_requirements
