@@ -72,7 +72,7 @@ mkdir -p models
 
 # Download LLaMA 7B q4_0 model (example URL - use actual download link)
 cd models
-wget https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_0.gguf
+https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-IQ4_XS.gguf
 # OR download from another source
 ```
 ## important step
