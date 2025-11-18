@@ -168,6 +168,7 @@ def check_model_files() -> Dict[str, bool]:
     
     # Check for LLaMA model
     llama_paths = [
+        "./models/gemma-3-4b-it-IQ4_XS.gguf",
         "./models/gemma-2b-it.Q6_K.gguf",
         #"gemma-2b-it.Q6_K.gguf",
         "./models/llama-2-7b-chat.Q4_0.gguf",
