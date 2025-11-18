@@ -12,7 +12,7 @@ from pathlib import Path
 
 # LLaMA model paths (in order of preference)
 LLAMA_MODEL_PATHS = [
-   
+    "./models/gemma-3-4b-it-IQ4_XS.gguf",
     "./models/gemma-2b-it.Q6_K.gguf",
    # "gemma-2b-it.Q6_K.gguf",
     "./models/llama-2-7b-chat.Q4_0.gguf",
