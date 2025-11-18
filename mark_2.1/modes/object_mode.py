@@ -36,6 +36,7 @@ class ObjectMode:
             # Initialize LLM for scene summarization
             print("Loading LLM for scene summarization...")
             model_paths = [
+                "./models/gemma-3-4b-it-IQ4_XS.gguf",
                 "./models/gemma-2b-it.Q6_K.gguf",
                  #"gemma-2b-it.Q6_K.gguf",
                 "./models/llama-2-7b-chat.Q4_0.gguf",
