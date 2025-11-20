@@ -47,6 +47,8 @@ sudo apt install -y libqtwebkit4 libgtk-3-dev libavcodec-dev libavformat-dev
 sudo apt install -y libswscale-dev libv4l-dev libxvidcore-dev libx264-dev
 sudo apt install libcap-dev
 pip install python-prctl
+sudo apt install python3-libgpiod
+sudo apt install libgpiod-dev
 
 # I2C, GPIO, and audio helpers
 sudo apt install -y python3-rpi.gpio python3-smbus i2c-tools
