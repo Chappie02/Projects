@@ -49,6 +49,7 @@ sudo apt install libcap-dev
 pip install python-prctl
 sudo apt install python3-libgpiod
 sudo apt install libgpiod-dev
+pip install gpiod
 
 # I2C, GPIO, and audio helpers
 sudo apt install -y python3-rpi.gpio python3-smbus i2c-tools
