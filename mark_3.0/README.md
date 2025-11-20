@@ -86,8 +86,10 @@ https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-IQ4
 ###important step
 ###install this before run
 ###for pc
+
 ##pip install torch==2.3.1+cpu torchvision==0.18.1+cpu torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
 ###for raspberrypi
+
 ##pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --extra-index-url https://download.pytorch.org/whl/cpu
 
 ##pip install --upgrade llama-cpp-python
