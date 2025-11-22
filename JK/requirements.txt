@@ -1,0 +1,19 @@
+# Core AI/ML Libraries
+llama-cpp-python>=0.2.20
+chromadb>=0.4.15
+ultralytics>=8.0.0
+
+# Hardware Control
+RPi.GPIO>=0.7.1
+luma.oled>=3.12.0
+Pillow>=10.0.0
+
+# Audio Processing
+SpeechRecognition>=3.10.0
+pyttsx3>=2.90
+pyaudio>=0.2.11
+
+# Utilities
+numpy>=1.24.0
+opencv-python>=4.8.0
+
