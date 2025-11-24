@@ -1,0 +1,12 @@
+luma.oled
+luma.core
+RPi.GPIO
+chromadb
+llama-cpp-python
+SpeechRecognition
+gTTS
+pyaudio
+ultralytics
+numpy
+pillow
+sounddevice
